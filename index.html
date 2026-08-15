@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#4355b9">
+<title>维词助手 · 听力答题</title>
+<!-- 外部依赖 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+<!-- 样式表 -->
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ============ 加载条 ============ -->
+<div class="linear-progress hidden" id="loadingBar"><div class="bar"></div></div>
+
+<!-- ============ 登录页 ============ -->
+<div id="loginView" class="login-wrap">
+  <div class="login-brand">
+    <div class="big">维</div>
+    <h1>维词助手</h1>
+    <p>听力答题 · 手动练习 · 历史重做 · 万词王</p>
+  </div>
+  <div class="card login-card">
+    <div class="segmented" id="loginSeg">
+      <div class="seg-item active" data-mode="password">密码登录</div>
+      <div class="seg-item" data-mode="sms">短信验证码</div>
+    </div>
+
+    <div id="passwordLogin">
+      <div class="field"><input type="tel" id="phone" inputmode="numeric" placeholder=" " autocomplete="tel"><label>手机号</label></div>
+      <div class="field"><input type="password" id="password" placeholder=" " autocomplete="current-password"><label>密码</label></div>
+      <div class="row" style="justify-content:space-between;margin-bottom:16px">
+        <div class="switch-row"><label class="switch"><input type="checkbox" id="showPass"><span class="track"></span><span class="thumb"></span></label><span class="switch-label">显示密码</span></div>
+        <span class="muted" style="cursor:pointer" id="tipPassword">密码登录不上? 试试短信</span>
+      </div>
+      <button class="btn block" id="passwordLoginBtn">登 录</button>
+    </div>
+
+    <div id="smsLogin" class="hidden">
+      <div class="field"><input type="tel" id="phoneSms" inputmode="numeric" placeholder=" "><label>手机号</label></div>
+      <div class="field flat"><input type="text" id="imgCaptcha" placeholder=" "><label>图形验证码</label></div>
+      <div class="row wrap" style="margin-bottom:16px">
+        <img id="captchaImg" alt="图形验证码" style="width:130px;height:48px;border-radius:8px;border:1px solid var(--outline-variant);object-fit:cover;background:var(--surface-container-low)" />
+        <button class="btn outlined small" id="getCaptchaBtn">获取图片</button>
+        <span class="muted" id="captchaHint">先获取图片验证码</span>
+      </div>
+      <div class="row" style="gap:8px;margin-bottom:16px">
+        <div class="field flat grow" style="margin:0"><input type="text" id="smsCode" placeholder=" "><label>短信验证码</label></div>
+        <button class="btn tonal" id="getSmsBtn" style="height:56px;white-space:nowrap">获取验证码</button>
+      </div>
+      <button class="btn block" id="smsLoginBtn">短信登录</button>
+    </div>
+  </div>
+  <p class="muted" style="text-align:center;max-width:420px">登录后用于获取班级/任务/题目详情，仅供学习用途</p>
+</div>
+
+<!-- ============ 应用主界面 ============ -->
+<div id="appView" class="hidden">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-icon">维</div>
+      <div>
+        <div class="topbar-title">维词助手 <span class="timer-group"><span id="topTimer" class="timer-chip" title="点击修改用时">00:00</span><button class="timer-ctrl" id="timerPauseBtn" title="暂停/继续">⏸</button><button class="timer-ctrl" id="timerResetBtn" title="重置">↺</button></span></div>
+        <div class="topbar-sub" id="userChip">未登录</div>
+      </div>
+    </div>
+    <button class="icon-btn" id="logoutBtn" title="退出登录">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+    </button>
+  </header>
+
+  <main class="content">
+    <!-- ===== 自动答题 ===== -->
+    <section id="tabAuto" class="tab-page active">
+      <div class="card">
+        <div class="card-title">⚡ 自动答题</div>
+        <div class="card-sub">自动获取题目、模拟作答并提交。任务ID留空则自动获取第一个任务。</div>
+        <div class="row wrap">
+          <div class="field flat grow"><input type="text" id="autoTaskId" placeholder=" "><label>任务ID（留空自动）</label></div>
+          <div class="field flat grow"><input type="text" id="autoClassId" placeholder=" "><label>班课ID（留空自动）</label></div>
+        </div>
+        <div class="row wrap">
+          <div class="field flat grow"><input type="text" id="autoDuration" placeholder=" " value=""><label>时长（秒 或 分,秒）</label></div>
+          <div class="field flat grow"><input type="text" id="autoWrongCount" placeholder=" "><label>错题数量（留空=0）</label></div>
+        </div>
+        <div class="field flat"><input type="text" id="autoWrongIds" placeholder=" "><label>自选错题题号（如1,3,5）</label></div>
+        <div class="row wrap" style="justify-content:space-between;margin:6px 0 12px">
+          <div class="switch-row"><label class="switch"><input type="checkbox" id="autoSelfSelect"><span class="track"></span><span class="thumb"></span></label><span class="switch-label">自选错题</span></div>
+          <div class="switch-row"><label class="switch"><input type="checkbox" id="autoOutputLog"><span class="track"></span><span class="thumb"></span></label><span class="switch-label">输出错题原文</span></div>
+        </div>
+        <button class="btn block" id="autoStartBtn">开始运行</button>
+        <div class="btn-row" style="margin-top:10px">
+          <button class="btn tonal grow" id="autoLoadTasksBtn">加载任务列表</button>
+          <button class="btn outlined grow" id="autoRankBtn">今日提交排名</button>
+          <div id="autoTasks" class="chip-row" style="margin-top:10px"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">📄 运行日志</div>
+        <div class="log-area" id="autoLog">日志将显示在此处...</div>
+        <div class="btn-row" style="margin-top:10px">
+          <button class="btn text grow" id="autoCopyLogBtn">复制日志</button>
+          <button class="btn text grow" id="autoClearLogBtn">清空日志</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 手动答题 ===== -->
+    <section id="tabManual" class="tab-page">
+      <div class="card">
+        <div class="card-title">📝 手动答题</div>
+        <div class="card-sub">一次展示 10 道大题：听力音频 + 选项 + 原文。支持作答、查看答案、复制。</div>
+        <div class="row wrap">
+          <div class="field flat grow"><select id="manualTaskSel"><option value="">— 从任务列表选择 —</option></select></div>
+          <button class="btn tonal" id="manualLoadBtn" style="height:56px">加载</button>
+        </div>
+        <div class="row wrap">
+          <div class="field flat grow"><input type="text" id="manualTaskInput" placeholder=" "><label>或直接输入任务ID</label></div>
+          <button class="btn outlined" id="manualLoadByIdBtn" style="height:56px">载入任务</button>
+        </div>
+        <div class="divider"></div>
+        <div id="manualCatalog" class="chip-row"></div>
+        <div id="manualCurrent"></div>
+      </div>
+      <div id="manualPager" class="pager hidden">
+        <button class="btn outlined small" id="manualPrev">上一页</button>
+        <span class="pageinfo" id="manualPageInfo">-</span>
+        <button class="btn outlined small" id="manualNext">下一页</button>
+      </div>
+      <div class="row" style="justify-content:space-between;margin:0 4px 10px">
+        <button class="btn tonal small" id="manualShowAnswer">🔎 显示答案</button>
+        <button class="btn text small" id="manualCopyCorrectAll">复制本页正确答案</button>
+        <button class="btn block" id="manualSubmitBtn" style="margin-bottom:12px">📤 提交本套答案</button>
+      </div>
+      <div id="manualList"></div>
+    </section>
+
+    <!-- ===== 历史 ===== -->
+    <section id="tabHistory" class="tab-page">
+      <div class="card">
+        <div class="card-title">🗂 历史作业</div>
+        <div class="card-sub">查看 / 重做历史作业。重做会进入手动答题流程。</div>
+        <button class="btn block" id="historyRefreshBtn">刷新历史</button>
+      </div>
+      <div id="historyList"></div>
+    </section>
+
+    <!-- ===== 万词王 ===== -->
+    <section id="tabKing" class="tab-page">
+      <div class="card">
+        <div class="card-title">🎧 获取听力</div>
+        <div class="card-sub">按 day_id 范围抓取听力任务，标题取自响应第一个 subject。支持复制全部听力 / 只复制答案。</div>
+        <div class="row wrap">
+          <div class="field flat grow"><input type="text" id="hdStart" placeholder=" " inputmode="numeric"><label>起始 day_id</label></div>
+          <div class="field flat grow"><input type="text" id="hdEnd" placeholder=" " inputmode="numeric"><label>结束 day_id</label></div>
+        </div>
+        <button class="btn block" id="hdFetchBtn">🔍 抓取听力</button>
+        <button class="btn tonal block" id="hdTodayBtn" style="margin-top:8px">📅 获取今日 day_id</button>
+        <div id="hdTodayList" class="chip-row" style="margin-top:8px"></div>
+        <div id="hdList" style="margin-top:12px"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">👑 万词王 · 竞技场</div>
+        <div class="card-sub">上传今日练习进度到维词竞技场</div>
+        <div class="field"><input type="text" id="kingClassId" placeholder=" "><label>班级 ID（默认当前账号）</label></div>
+        <div class="field"><input type="text" id="kingCount" placeholder=" " inputmode="numeric"><label>完成数 count</label></div>
+        <button class="btn block" id="kingUploadBtn">上传进度</button>
+        <div class="divider"></div>
+        <div class="card-sub">今日提交情况：</div>
+        <button class="btn tonal block" id="kingRankBtn">查看提交排名</button>
+      </div>
+      <div class="card">
+        <div class="card-title">👤 账号信息</div>
+        <div class="card-sub">获取当前账号的称号 / 学习力 / 坚持天数 / 已掌握词 / 等级</div>
+        <button class="btn tonal block" id="accInfoBtn">获取账号信息</button>
+        <div id="accInfoBody" class="hidden" style="margin-top:12px"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">📊 账号数据修改</div>
+        <div class="card-sub">修改学习力(know_well) / 已掌握词(learn) / 坚持天数(use_day)，保存后覆盖原值</div>
+        <div class="row wrap">
+          <div class="field flat grow"><input type="text" id="nkKnowWell" placeholder=" " inputmode="numeric"><label>学习力</label></div>
+          <div class="field flat grow"><input type="text" id="nkLearn" placeholder=" " inputmode="numeric"><label>已掌握词</label></div>
+          <div class="field flat grow"><input type="text" id="nkUseDay" placeholder=" " inputmode="numeric"><label>坚持天数</label></div>
+        </div>
+        <button class="btn block" id="nkSaveBtn">💾 保存账号数据</button>
+      </div>
+      <div class="card">
+        <div class="card-title">📄 上传结果</div>
+        <div class="log-area" id="kingLog">结果将显示在此处...</div>
+      </div>
+    </section>
+  </main>
+
+  <nav class="bottom-nav">
+    <div class="nav-item active" data-tab="auto">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      <span class="lbl">自动答题</span>
+    </div>
+    <div class="nav-item" data-tab="manual">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 13v-3M11 13V7M15 13V9M19 13v-5"/></svg>
+      <span class="lbl">手动答题</span>
+    </div>
+    <div class="nav-item" data-tab="history">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      <span class="lbl">历史</span>
+    </div>
+    <div class="nav-item" data-tab="king">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 21h20"/><path d="M6 21V8l-3 4M6 8l3 4M22 21V8l-3 4M22 8l-3 4"/><circle cx="12" cy="4" r="2"/></svg>
+      <span class="lbl">其他功能</span>
+    </div>
+  </nav>
+</div>
+
+<!-- ============ 弹窗 ============ -->
+<div id="rankOverlay" class="overlay hidden">
+  <div class="sheet">
+    <div class="sheet-header"><span>👑 万词王排名</span><span class="grow"></span><button class="icon-btn" id="rankClose"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+    <div class="sheet-body"><div class="chip-row" id="rankRangeChips"></div><div class="log-area" id="rankList" style="max-height:none;border:none"></div></div>
+  </div>
+</div>
+
+<div id="submitOverlay" class="overlay hidden">
+  <div class="sheet">
+    <div class="sheet-header"><span>📤 确认提交</span><span class="grow"></span><button class="icon-btn" id="submitClose"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+    <div class="sheet-body">
+      <div id="submitInfo" class="detail-text" style="margin-bottom:10px"></div>
+      <div class="field"><input type="text" id="submitTime" placeholder=" "><label>用时（秒 或 分,秒）</label></div>
+    </div>
+    <div class="sheet-actions">
+      <button class="btn outlined grow" id="submitCancel">取消</button>
+      <button class="btn grow" id="submitOk">确认提交</button>
+    </div>
+  </div>
+</div>
+
+<div id="detailOverlay" class="overlay hidden">
+  <div class="sheet">
+    <div class="sheet-header"><span>📋 题目详情</span><span class="grow"></span><button class="icon-btn" id="detailClose"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+    <div class="sheet-body" id="detailBody"></div>
+    <div class="sheet-actions">
+      <button class="btn tonal grow" id="detailCopyAll">复制全部</button>
+      <button class="btn grow" id="detailCopyCorrect">复制正确答案</button>
+    </div>
+  </div>
+</div>
+
+<div id="timerEditOverlay" class="overlay hidden">
+  <div class="sheet">
+    <div class="sheet-header"><span>⏱ 修改用时</span><span class="grow"></span><button class="icon-btn" id="timerEditClose"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+    <div class="sheet-body">
+      <div class="field"><input type="text" id="timerEditInput" placeholder=" " inputmode="numeric"><label>用时（秒 或 分,秒）</label></div>
+    </div>
+    <div class="sheet-actions">
+      <button class="btn outlined grow" id="timerEditCancel">取消</button>
+      <button class="btn grow" id="timerEditOk">确定</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<!-- ============ 应用脚本 (ES Module) ============ -->
+<script type="module" src="app.js"></script>
+</body>
+</html>
