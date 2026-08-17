@@ -1,0 +1,171 @@
+维词助手模块功能介绍
+
+本程序是一个面向“维词”学习平台的 Web 助手，提供自动答题、手动练习、历史重做、万词王数据上传、账号信息查询与修改、听力内容抓取等功能。前端采用原生 HTML/CSS/JavaScript，通过 ES Modules 组织代码。
+
+---
+
+文件结构概览
+
+```
+├── index.html         页面结构
+├── style.css          全局样式
+├── state.js           全局状态与常量
+├── utils.js           通用工具函数
+├── api.js             网络请求封装与接口定义
+├── ui.js              通用 UI 操作（toast、loading、计时器、弹窗等）
+├── common.js          公共常量、DOM 快捷函数、日志函数、题目辅助函数
+├── auto.js            自动答题模块
+├── manual.js          手动答题模块
+├── history.js         历史记录模块
+├── king.js            万词王、账号信息、听力抓取模块
+└── app.js             入口文件，负责初始化与事件绑定
+```
+
+---
+
+各模块详细功能
+
+1. state.js —— 全局状态与常量
+
+· 定义基础常量：SALT、AES_KEY、BASE_PARAMS、API_BASE、AUDIO_BASE、RANK_BASE 等。
+· 定义全局共享状态对象 S，包含：
+  · 登录信息：session、phone、classId
+  · 任务列表：tasks
+  · 手动答题状态：manual（任务ID、目录、题目、页码、答案选择、显示答案等）
+  · 历史记录：history
+  · 计时器状态：timer
+· 导出 initState() 函数，从 localStorage 恢复登录状态。
+
+2. utils.js —— 通用工具函数
+
+· 加密/编码相关：md5、aesEncrypt、urlEncode。
+· 字符串处理：esc（HTML转义）、htmlToPlain（HTML转纯文本）。
+· 时间处理：formatTime（时间戳格式化）、parseDuration（解析时长，支持“秒”或“分,秒”等）。
+· 音频路径：audioUrl（拼接音频完整URL）。
+· 题目辅助：parseSubs（解析子题JSON）、collectOptions（收集选项）、getCorrectLetter（获取选项字母）、extractQuestionNumber（提取题号）。
+· 其他：sleep（延时）、maskPhone（手机号脱敏）、copyText（复制到剪贴板）。
+
+3. api.js —— 网络请求与接口封装
+
+· 统一封装 request 函数，加入超时控制和友好错误处理。
+· 提供 apiGet 和 apiPostForm 用于 GET/POST 表单请求。
+· 抽出 buildEncryptedFormData，避免重复构造 AES 加密参数。
+· 导出具体接口函数：
+  · 登录相关：loginWithPassword、getLoginKey、buildCaptchaUrl、sendSmsCode、loginWithSms
+  · 数据获取：getClassInfo、getTaskList、getTaskCatalog、getTaskTest、getTaskHistory
+  · 提交相关：submitError、submitSync
+  · 万词王：kingUpload、getKingRank
+  · 账号：saveNumberData、getUserInfo
+
+4. ui.js —— 通用 UI 操作
+
+· toast：轻提示。
+· showLoading / hideLoading：加载进度条控制。
+· syncFieldLabels / bindFieldLabels：输入框浮动标签状态同步。
+· 计时器控制：startTimer、stopTimer、pauseTimer、resumeTimer、resetTimer、setTimerSeconds、updateTimer、openTimerEdit、closeTimerEdit、applyTimerEdit。
+· 弹窗管理：
+  · 详情弹窗：openDetail、closeDetail
+  · 提交弹窗：openSubmitDialog、closeSubmitDialog
+  · 排名弹窗：closeKingRank
+· 共享变量：detailMainQ（当前查看详情的题目）。
+
+5. common.js —— 公共常量和辅助函数
+
+· 常量导出：PAGE_SIZE、AUTO_COLORS、KING_RANGES、LEVELS。
+· DOM 快捷函数：$、$val。
+· 日志函数：alog（自动答题日志）、klog（万词王日志）、flushLog、resetAutoLog。
+· 题目辅助：mainSoundPath、mainSoundName、globalQuestionIndex。
+
+6. auto.js —— 自动答题模块
+
+· 核心函数 runAutoTask()：
+  · 获取任务和班课信息。
+  · 遍历目录和题目，解析正确答案。
+  · 支持随机错题（指定数量）或自选错题（指定题号）。
+  · 生成答题数据并输出错题原文、答案汇总。
+  · 调用 submitError 提交错题，调用 submitSync 同步任务。
+· 辅助函数：parseHighlights（解析原文高亮）、highlightSpeakers（高亮说话人）。
+· 导出 loadAutoTasks（加载任务列表）、renderAutoTasks（渲染任务芯片）。
+
+7. manual.js —— 手动答题模块
+
+· loadDay：加载指定单元的题目。
+· loadManualTask：加载手动答题任务，初始化计时器。
+· renderCatalogChips：渲染目录选择器。
+· renderManual：渲染题目卡片（音频、选项、原文、解析等），绑定选项点击等事件。
+· buildOptionHTML：生成选项 HTML。
+· buildDetailAllText / buildDetailCorrectText：生成详情弹窗的纯文本内容。
+· doSubmitManual：提交手动作答结果，包括错题和同步。
+
+8. history.js —— 历史记录模块
+
+· loadHistory：请求并渲染历史作业列表。
+· renderHistory：将历史数据渲染为卡片，显示任务名、正确率、时间，并提供“重做”按钮。
+· 重做时切换到手动答题 tab 并加载对应任务。
+
+9. king.js —— 万词王、账号信息、听力抓取
+
+· 万词王：
+  · runKingUpload：上传完成数到竞技场。
+  · showKingRank / loadKingRank：查看不同范围（全国/省/市/学校/班级）的排名。
+· 账号信息：
+  · loadAccountInfo：获取并展示学习力、坚持天数、已掌握词、等级等信息。
+  · runSaveNumber：修改学习力/已掌握词/坚持天数并保存。
+· 听力抓取：
+  · fetchHearing：按 day_id 范围抓取听力，展示列表。
+  · renderHearingList：渲染听力结果卡片。
+  · copyHearingAll / copyHearingAnswers：复制听力原文或答案。
+  · fetchTodayDayIds：获取今日 day_id 列表。
+· 辅助函数：levelInfo（计算等级和进度）、accRow（生成账号信息行）、isTodayTs（判断今日时间戳）。
+
+10. app.js —— 入口与事件绑定
+
+· 初始化：调用 initState() 恢复状态。
+· 定义全局函数：fillTaskSelect（填充手动任务下拉框）、goTab（切换底部导航 tab）。
+· 登录相关：密码登录、短信登录（图形验证码、倒计时）、退出登录。
+· 为各个按钮绑定事件：
+  · 自动答题：启动、加载任务、打开排名、复制/清空日志。
+  · 手动答题：加载任务、翻页、显示答案、复制答案、提交。
+  · 历史：刷新历史。
+  · 万词王及其他：上传、查看排名、获取账号信息、保存账号数据、计时器控制、抓取听力等。
+· 启动时检查会话有效性，决定进入应用或登录页。
+
+11. index.html —— 页面结构
+
+· 包含登录页、主应用界面（四个 tab：自动答题、手动答题、历史、其他功能）。
+· 集成弹窗：排名、提交确认、详情、计时器编辑。
+· 引入外部 CryptoJS 库。
+· 内联脚本实现时长选择器。
+
+12. style.css —— 全局样式
+
+· 定义 Material Design 风格的颜色变量、圆角、阴影。
+· 布局：顶部栏、底部导航、卡片、按钮、输入框、弹窗、日志区等。
+· 响应式适配移动端。
+
+---
+
+模块依赖关系
+
+· app.js 是入口，依赖所有业务模块（auto.js、manual.js、history.js、king.js）及通用模块。
+· 业务模块依赖 api.js、utils.js、ui.js、common.js。
+· ui.js 依赖 state.js、utils.js。
+· api.js 依赖 utils.js、state.js。
+· common.js 依赖 state.js、utils.js。
+· state.js 和 utils.js 为最底层，不依赖业务模块。
+
+---
+
+使用说明
+
+1. 运行方式：必须通过本地 HTTP 服务器访问（如 python -m http.server），避免 ES 模块的 CORS 限制。
+2. 跨域问题：API 服务器若未配置 CORS，需使用浏览器插件或本地代理解决。
+3. 登录：支持密码登录和短信验证码登录，登录后自动加载班级、任务等信息。
+4. 自动答题：填写任务ID、班课ID（可自动），设置错题数量和时长，点击开始运行。
+5. 手动答题：选择任务，加载题目，可播放音频、选择答案、查看原文、复制答案、提交。
+6. 历史：查看历史作业并重做。
+7. 其他功能：上传万词王进度、查看排名、获取账号信息、修改账号数据、抓取听力内容等。
+
+---
+
+以上即为各模块的功能介绍，结构清晰，便于后续维护和扩展。

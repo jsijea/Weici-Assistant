@@ -122,7 +122,8 @@ body{
 .btn.small{height:34px;padding:0 14px;font-size:13px;border-radius:34px}
 .btn svg{width:18px;height:18px}
 .btn-row{display:flex;gap:10px;flex-wrap:wrap}
-.btn-row .btn{grow:0}
+/* 修复：按钮不应 flex 收缩，保持自然宽度 */
+.btn-row .btn{flex:0 0 auto}
 /* ==================== 输入框 ==================== */
 .field{position:relative;margin-bottom:16px}
 .field input,.field select{

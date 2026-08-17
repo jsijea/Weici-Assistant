@@ -9,6 +9,46 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
 <!-- 样式表 -->
 <link rel="stylesheet" href="style.css">
+<style>
+  /* ===== 时钟选择器额外样式 ===== */
+  .picker-popup {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    background: var(--surface-container-low);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-3);
+    border: 1px solid var(--outline-variant);
+    z-index: 120;
+    min-width: 200px;
+    backdrop-filter: blur(8px);
+    background: var(--surface);
+    padding: 8px 0;
+  }
+  .picker-select {
+    width: 64px;
+    height: 140px;
+    border-radius: var(--radius-xs);
+    border: 1px solid var(--outline-variant);
+    background: var(--surface);
+    color: var(--on-surface);
+    font-size: 18px;
+    font-weight: 600;
+    text-align: center;
+    padding: 4px 0;
+    outline: none;
+    scroll-behavior: smooth;
+  }
+  .picker-select:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px var(--primary-container);
+  }
+  .picker-select option {
+    text-align: center;
+    padding: 4px 0;
+  }
+</style>
 </head>
 <body>
 
@@ -26,6 +66,7 @@
     <div class="segmented" id="loginSeg">
       <div class="seg-item active" data-mode="password">密码登录</div>
       <div class="seg-item" data-mode="sms">短信验证码</div>
+      <div class="seg-item" data-mode="session">Session登录</div>
     </div>
 
     <div id="passwordLogin">
@@ -52,6 +93,12 @@
       </div>
       <button class="btn block" id="smsLoginBtn">短信登录</button>
     </div>
+
+    <div id="sessionLogin" class="hidden">
+      <div class="field"><input type="tel" id="sessionPhone" inputmode="numeric" placeholder=" " autocomplete="tel"><label>手机号</label></div>
+      <div class="field"><input type="text" id="sessionInput" placeholder=" " autocomplete="off"><label>Session 字符串</label></div>
+      <button class="btn block" id="sessionLoginBtn">Session 登录</button>
+    </div>
   </div>
   <p class="muted" style="text-align:center;max-width:420px">登录后用于获取班级/任务/题目详情，仅供学习用途</p>
 </div>
@@ -64,6 +111,7 @@
       <div>
         <div class="topbar-title">维词助手 <span class="timer-group"><span id="topTimer" class="timer-chip" title="点击修改用时">00:00</span><button class="timer-ctrl" id="timerPauseBtn" title="暂停/继续">⏸</button><button class="timer-ctrl" id="timerResetBtn" title="重置">↺</button></span></div>
         <div class="topbar-sub" id="userChip">未登录</div>
+        <button id="copySessionBtn" class="timer-ctrl" style="width:auto; padding:0 8px; border-radius:12px; background:var(--secondary-container); color:var(--on-secondary-container); font-size:12px; font-weight:600; cursor:pointer; margin-top:4px;" title="复制 Session">复制Session</button>
       </div>
     </div>
     <button class="icon-btn" id="logoutBtn" title="退出登录">
@@ -74,6 +122,10 @@
   <main class="content">
     <!-- ===== 自动答题 ===== -->
     <section id="tabAuto" class="tab-page active">
+      <div id="projectInfo" style="text-align:center; margin-bottom:14px; font-size:13px; color:var(--on-surface-variant);">
+        <span>github: <a href="https://github.com/jsijea/Weici-Assistant" target="_blank" rel="noopener noreferrer" style="color:var(--primary); text-decoration:none;">https://github.com/jsijea/Weici-Assistant</a></span><br>
+        <span>问题反馈: <a href="mailto:jsijea@163.com" style="color:var(--primary); text-decoration:none;">jsijea@163.com</a></span>
+      </div>
       <div class="card">
         <div class="card-title">⚡ 自动答题</div>
         <div class="card-sub">自动获取题目、模拟作答并提交。任务ID留空则自动获取第一个任务。</div>
@@ -81,8 +133,32 @@
           <div class="field flat grow"><input type="text" id="autoTaskId" placeholder=" "><label>任务ID（留空自动）</label></div>
           <div class="field flat grow"><input type="text" id="autoClassId" placeholder=" "><label>班课ID（留空自动）</label></div>
         </div>
+        <!-- ===== 修改后的时长输入框 ===== -->
         <div class="row wrap">
-          <div class="field flat grow"><input type="text" id="autoDuration" placeholder=" " value=""><label>时长（秒 或 分,秒）</label></div>
+          <div class="field flat grow" style="position:relative; display:flex; align-items:center; padding-right:4px;">
+            <input type="text" id="autoDuration" placeholder=" " value="" style="flex:1; min-width:0;">
+            <label>时长（秒 或 分,秒）</label>
+            <button type="button" id="durationPickerBtn" class="icon-btn" style="width:36px; height:36px; flex-shrink:0; margin-right:2px;" title="时钟选择">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </button>
+            <!-- 时钟弹出面板 -->
+            <div id="durationPickerPopup" class="picker-popup hidden">
+              <div style="display:flex; gap:16px; justify-content:center; padding:12px 8px 8px;">
+                <div style="text-align:center;">
+                  <div style="font-size:12px; color:var(--on-surface-variant); margin-bottom:4px; font-weight:600;">分</div>
+                  <select id="durMin" size="5" class="picker-select"></select>
+                </div>
+                <div style="text-align:center;">
+                  <div style="font-size:12px; color:var(--on-surface-variant); margin-bottom:4px; font-weight:600;">秒</div>
+                  <select id="durSec" size="5" class="picker-select"></select>
+                </div>
+              </div>
+              <div class="btn-row" style="padding:6px 12px 12px; justify-content:flex-end; gap:8px;">
+                <button class="btn text small" id="durPickerCancel">取消</button>
+                <button class="btn small" id="durPickerOk">确定</button>
+              </div>
+            </div>
+          </div>
           <div class="field flat grow"><input type="text" id="autoWrongCount" placeholder=" "><label>错题数量（留空=0）</label></div>
         </div>
         <div class="field flat"><input type="text" id="autoWrongIds" placeholder=" "><label>自选错题题号（如1,3,5）</label></div>
@@ -264,5 +340,116 @@
 
 <!-- ============ 应用脚本 (ES Module) ============ -->
 <script type="module" src="app.js"></script>
+
+<!-- ============ 时钟选择器独立脚本 ============ -->
+<script>
+  (function() {
+    // 确保 DOM 加载完成
+    const ready = (fn) => {
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', fn);
+      } else {
+        fn();
+      }
+    };
+
+    ready(function() {
+      const pickerBtn = document.getElementById('durationPickerBtn');
+      const pickerPopup = document.getElementById('durationPickerPopup');
+      const durMin = document.getElementById('durMin');
+      const durSec = document.getElementById('durSec');
+      const durPickerOk = document.getElementById('durPickerOk');
+      const durPickerCancel = document.getElementById('durPickerCancel');
+      const autoDurationInput = document.getElementById('autoDuration');
+
+      // 填充下拉选项（分：0~99，秒：0~59）
+      for (let i = 0; i <= 99; i++) {
+        const opt = document.createElement('option');
+        opt.value = i;
+        opt.textContent = String(i).padStart(2, '0');
+        durMin.appendChild(opt);
+      }
+      for (let i = 0; i <= 59; i++) {
+        const opt = document.createElement('option');
+        opt.value = i;
+        opt.textContent = String(i).padStart(2, '0');
+        durSec.appendChild(opt);
+      }
+
+      // 解析当前输入值，设置到选择器
+      function setPickerFromInput() {
+        let val = autoDurationInput.value.trim();
+        let min = 0, sec = 0;
+        if (val) {
+          let parts = val.split(/[,，：:]+/).map(p => parseInt(p.trim()));
+          if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+            min = parts[0]; sec = parts[1];
+          } else if (parts.length === 1 && !isNaN(parts[0])) {
+            sec = parts[0];
+          }
+          if (sec >= 60) {
+            min += Math.floor(sec / 60);
+            sec = sec % 60;
+          }
+          if (min > 99) min = 99;
+          if (sec > 59) sec = 59;
+        }
+        durMin.value = min;
+        durSec.value = sec;
+      }
+
+      // 从选择器取值，填入输入框
+      function setInputFromPicker() {
+        const min = parseInt(durMin.value) || 0;
+        const sec = parseInt(durSec.value) || 0;
+        let result;
+        if (min > 0) {
+          result = min + ',' + sec;
+        } else {
+          result = String(sec);
+        }
+        autoDurationInput.value = result;
+        // 触发 input 事件，让原有的监听（如本地存储）正常工作
+        autoDurationInput.dispatchEvent(new Event('input', { bubbles: true }));
+        // 也触发 change 事件
+        autoDurationInput.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+
+      // 打开 / 关闭
+      pickerBtn.onclick = function (e) {
+        e.stopPropagation();
+        if (pickerPopup.classList.contains('hidden')) {
+          setPickerFromInput();
+          pickerPopup.classList.remove('hidden');
+        } else {
+          pickerPopup.classList.add('hidden');
+        }
+      };
+      durPickerOk.onclick = function () {
+        setInputFromPicker();
+        pickerPopup.classList.add('hidden');
+      };
+      durPickerCancel.onclick = function () {
+        pickerPopup.classList.add('hidden');
+      };
+      // 点击弹出层外部关闭
+      document.addEventListener('click', function (e) {
+        if (!pickerPopup.classList.contains('hidden')) {
+          const container = pickerBtn.parentElement;
+          if (!container.contains(e.target)) {
+            pickerPopup.classList.add('hidden');
+          }
+        }
+      });
+      // 选择器滚动到可视区域（避免被遮挡）
+      [durMin, durSec].forEach(sel => {
+        sel.addEventListener('focus', function () {
+          this.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        });
+      });
+    });
+  })();
+</script>
+
 </body>
 </html>

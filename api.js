@@ -2,21 +2,58 @@
 import { urlEncode, aesEncrypt, md5 } from './utils.js';
 import { BASE_PARAMS, API_BASE, SALT } from './state.js';
 
+// 请求超时时间（毫秒）
+const REQUEST_TIMEOUT = 15000;
+
+/**
+ * 统一网络请求封装：超时控制 + 友好错误处理
+ */
+async function request(url, options = {}) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
+  try {
+    const resp = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(timeoutId);
+    if (!resp.ok) {
+      throw new Error(`HTTP ${resp.status} ${resp.statusText || ''}`.trim());
+    }
+    return await resp.json();
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') {
+      throw new Error('请求超时，请检查网络后重试');
+    }
+    // 其他网络错误或 JSON 解析错误
+    throw new Error(`网络请求失败: ${err.message}`);
+  }
+}
+
 export async function apiGet(path, params) {
   const url = API_BASE + path + '?' + urlEncode(params);
-  const resp = await fetch(url);
-  if (!resp.ok) throw new Error('HTTP ' + resp.status);
-  return await resp.json();
+  return request(url);
 }
 
 export async function apiPostForm(path, data) {
-  const resp = await fetch(API_BASE + path, {
+  return request(API_BASE + path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: urlEncode(data)
   });
-  if (!resp.ok) throw new Error('HTTP ' + resp.status);
-  return await resp.json();
+}
+
+/**
+ * 构建需要 AES 加密 param 的接口数据（抽取公共逻辑）
+ * @param {Array<[string, string]>} formItems - 键值对数组
+ * @returns {Object} 包含 param 及所有原始字段的对象
+ */
+function buildEncryptedFormData(formItems) {
+  const bodyToEncrypt = formItems
+    .map(([k, v]) => encodeURIComponent(k) + '=' + encodeURIComponent(v))
+    .join('&');
+  const param = aesEncrypt(bodyToEncrypt);
+  const finalData = { param };
+  formItems.forEach(([k, v]) => { finalData[k] = v; });
+  return finalData;
 }
 
 export async function loginWithPassword(phone, password) {
@@ -93,20 +130,36 @@ export async function submitSync(taskId, dayId, userAnswers, correctMap, phone, 
   }
   const syncRecord = { user_code: phone, task_id: taskId, push_id: 0, day: dayId, finish_word: 1, finish_time: Math.floor(Date.now() / 1000), duration: duration, data: JSON.stringify(dataList) };
   const jsonData = JSON.stringify([syncRecord]);
-  const formItems = [['json_data', jsonData], ['is_wifi', BASE_PARAMS.is_wifi], ['app_version', BASE_PARAMS.app_version], ['user_code', phone], ['bound_id', BASE_PARAMS.bound_id], ['session', session], ['app_id', BASE_PARAMS.app_id], ['device', BASE_PARAMS.device], ['platform', BASE_PARAMS.platform]];
-  const bodyToEncrypt = formItems.map(([k, v]) => encodeURIComponent(k) + '=' + encodeURIComponent(v)).join('&');
-  const param = aesEncrypt(bodyToEncrypt);
-  const finalData = { param, json_data: jsonData, is_wifi: BASE_PARAMS.is_wifi, app_version: BASE_PARAMS.app_version, user_code: phone, bound_id: BASE_PARAMS.bound_id, session, app_id: BASE_PARAMS.app_id, device: BASE_PARAMS.device, platform: BASE_PARAMS.platform };
+  const formItems = [
+    ['json_data', jsonData],
+    ['is_wifi', BASE_PARAMS.is_wifi],
+    ['app_version', BASE_PARAMS.app_version],
+    ['user_code', phone],
+    ['bound_id', BASE_PARAMS.bound_id],
+    ['session', session],
+    ['app_id', BASE_PARAMS.app_id],
+    ['device', BASE_PARAMS.device],
+    ['platform', BASE_PARAMS.platform]
+  ];
+  const finalData = buildEncryptedFormData(formItems);
   const data = await apiPostForm('/gaozhong/weici/group/v30/student/task/sync', finalData);
   return data.result_code === 200;
 }
 
 export async function kingUpload(phone, session, classId, count) {
   const jsonData = JSON.stringify([{ user_code: phone, class_id: parseInt(classId), app_id: 8, count: parseInt(count), finish_time: Math.floor(Date.now() / 1000) }]);
-  const formItems = [['json_data', jsonData], ['is_wifi', BASE_PARAMS.is_wifi], ['app_version', BASE_PARAMS.app_version], ['user_code', phone], ['bound_id', BASE_PARAMS.bound_id], ['session', session], ['app_id', BASE_PARAMS.app_id], ['device', BASE_PARAMS.device], ['platform', BASE_PARAMS.platform]];
-  const bodyToEncrypt = formItems.map(([k, v]) => encodeURIComponent(k) + '=' + encodeURIComponent(v)).join('&');
-  const param = aesEncrypt(bodyToEncrypt);
-  const finalData = { param, json_data: jsonData, is_wifi: BASE_PARAMS.is_wifi, app_version: BASE_PARAMS.app_version, user_code: phone, bound_id: BASE_PARAMS.bound_id, session, app_id: BASE_PARAMS.app_id, device: BASE_PARAMS.device, platform: BASE_PARAMS.platform };
+  const formItems = [
+    ['json_data', jsonData],
+    ['is_wifi', BASE_PARAMS.is_wifi],
+    ['app_version', BASE_PARAMS.app_version],
+    ['user_code', phone],
+    ['bound_id', BASE_PARAMS.bound_id],
+    ['session', session],
+    ['app_id', BASE_PARAMS.app_id],
+    ['device', BASE_PARAMS.device],
+    ['platform', BASE_PARAMS.platform]
+  ];
+  const finalData = buildEncryptedFormData(formItems);
   return await apiPostForm('/gaozhong/weici/group/v30/arena/king/upload', finalData);
 }
 
@@ -130,9 +183,7 @@ export async function saveNumberData(phone, session, knowWell, learn, useDay) {
     ['device', BASE_PARAMS.device],
     ['platform', BASE_PARAMS.platform]
   ];
-  const bodyToEncrypt = formItems.map(([k, v]) => encodeURIComponent(k) + '=' + encodeURIComponent(v)).join('&');
-  const param = aesEncrypt(bodyToEncrypt);
-  const finalData = { param, know_well: String(knowWell), learn: String(learn), use_day: String(useDay), is_wifi: BASE_PARAMS.is_wifi, app_version: BASE_PARAMS.app_version, user_code: phone, bound_id: BASE_PARAMS.bound_id, session: session, app_id: BASE_PARAMS.app_id, device: BASE_PARAMS.device, platform: BASE_PARAMS.platform };
+  const finalData = buildEncryptedFormData(formItems);
   return await apiPostForm('/gaozhong/weici/sync/v2/number/save', finalData);
 }
 
@@ -140,4 +191,21 @@ export async function getUserInfo(phone, session) {
   const data = await apiGet('/gaozhong/weici/sync/user/info', { medal_time_stamp: 0, ...BASE_PARAMS, user_code: phone, session: session });
   if (data.result_code === 200) return data.user_info || {};
   throw new Error(data.description || '获取账号信息失败');
+}
+
+/**
+ * 校验当前 session 是否有效
+ * 通过调用轻量级接口 getClassInfo 来判断，成功返回 true，失败返回 false
+ * @param {string} phone 用户手机号
+ * @param {string} session 用户 session
+ * @returns {Promise<boolean>}
+ */
+export async function ensureSessionValid(phone, session) {
+  if (!phone || !session) return false;
+  try {
+    await getClassInfo(phone, session);
+    return true;
+  } catch (e) {
+    return false;
+  }
 }

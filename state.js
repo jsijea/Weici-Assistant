@@ -23,13 +23,23 @@ export const LEVELS = [
   {lv:9, title:'状元', min:216000, max:Infinity}
 ];
 
+// 初始状态不直接读取 localStorage，改为通过 initState 初始化
 export const S = {
-  session: localStorage.getItem('wz_session') || '',
-  phone: localStorage.getItem('wz_phone') || '',
-  classId: localStorage.getItem('wz_classId') || '',
+  session: '',
+  phone: '',
+  classId: '',
   tasks: [],
   loginKey: null,
   manual: { taskId: null, taskName: '', catalogs: [], dayId: null, dayName: '', test: [], page: 0, showAnswer: false, selections: {} },
   history: [],
   timer: { start: null, id: null, running: false, acc: 0 }
 };
+
+/**
+ * 从 localStorage 恢复登录状态，应在应用启动时调用
+ */
+export function initState() {
+  S.session = localStorage.getItem('wz_session') || '';
+  S.phone = localStorage.getItem('wz_phone') || '';
+  S.classId = localStorage.getItem('wz_classId') || '';
+}

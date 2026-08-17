@@ -64,14 +64,17 @@ export function maskPhone(p) {
 
 export function parseDuration(input) {
   if (!input || input.trim() === '') return 1;
-  let c = input.trim().replace(/，/g, ',').split(/[\s,]+/).filter(s => s !== '').join(',');
-  if (!c) return 1;
-  if (!c.includes(',')) {
-    const s = parseInt(c); return isNaN(s) ? 1 : Math.max(s, 1);
+  let c = input.trim().replace(/，/g, ',').replace(/：/g, ':');
+  // 支持 "分,秒" 或 "分:秒" 或 "时:分:秒" 等
+  const parts = c.split(/[,:]+/).filter(s => s !== '').map(x => parseInt(x.trim()));
+  if (!parts.length || parts.some(isNaN)) return 1;
+  if (parts.length === 1) {
+    return Math.max(parts[0], 1);
+  } else if (parts.length === 2) {
+    return Math.max(parts[0] * 60 + parts[1], 1);
+  } else if (parts.length === 3) {
+    return Math.max(parts[0] * 3600 + parts[1] * 60 + parts[2], 1);
   }
-  const parts = c.split(',').map(x => parseInt(x.trim()));
-  if (parts.length === 2) { if (isNaN(parts[0]) || isNaN(parts[1])) return 1; return Math.max(parts[0] * 60 + parts[1], 1); }
-  if (parts.length === 3) { if (parts.some(isNaN)) return 1; return Math.max(parts[0] * 3600 + parts[1] * 60 + parts[2], 1); }
   return 1;
 }
 
@@ -83,7 +86,7 @@ export function collectOptions(sub) {
   const opts = [];
   for (const k of ['answer_a', 'answer_b', 'answer_c', 'answer_d']) {
     const v = sub[k];
-    if (v && !opts.includes(v)) opts.push(v);
+    if (v) opts.push(v);  // 不再去重，保留所有选项
   }
   const c = sub.answer;
   if (c && !opts.includes(c)) opts.push(c);
@@ -91,7 +94,6 @@ export function collectOptions(sub) {
 }
 
 export function copyText(text, tip) {
-  // 使用 window.toast 避免循环依赖
   const done = (ok) => {
     if (window.toast) window.toast(ok ? (tip || '已复制到剪贴板') : '复制失败，请手动复制');
     else alert(ok ? '已复制' : '复制失败');
