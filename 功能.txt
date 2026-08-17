@@ -1,3 +1,4 @@
+```text
 维词助手模块功能介绍
 
 本程序是一个面向“维词”学习平台的 Web 助手，提供自动答题、手动练习、历史重做、万词王数据上传、账号信息查询与修改、听力内容抓取等功能。前端采用原生 HTML/CSS/JavaScript，通过 ES Modules 组织代码。
@@ -7,6 +8,7 @@
 文件结构概览
 
 ```
+
 ├── index.html         页面结构
 ├── style.css          全局样式
 ├── state.js           全局状态与常量
@@ -19,6 +21,7 @@
 ├── history.js         历史记录模块
 ├── king.js            万词王、账号信息、听力抓取模块
 └── app.js             入口文件，负责初始化与事件绑定
+
 ```
 
 ---
@@ -56,6 +59,7 @@
   · 提交相关：submitError、submitSync
   · 万词王：kingUpload、getKingRank
   · 账号：saveNumberData、getUserInfo
+  · 会话校验：ensureSessionValid（通过调用 getClassInfo 判断 session 是否有效）
 
 4. ui.js —— 通用 UI 操作
 
@@ -79,60 +83,72 @@
 6. auto.js —— 自动答题模块
 
 · 核心函数 runAutoTask()：
+  · 校验登录状态和 session 有效性，失效时提示并终止。
   · 获取任务和班课信息。
   · 遍历目录和题目，解析正确答案。
   · 支持随机错题（指定数量）或自选错题（指定题号）。
   · 生成答题数据并输出错题原文、答案汇总。
   · 调用 submitError 提交错题，调用 submitSync 同步任务。
 · 辅助函数：parseHighlights（解析原文高亮）、highlightSpeakers（高亮说话人）。
-· 导出 loadAutoTasks（加载任务列表）、renderAutoTasks（渲染任务芯片）。
+· 导出 loadAutoTasks（加载任务列表，带 session 校验）、renderAutoTasks（渲染任务芯片）。
 
 7. manual.js —— 手动答题模块
 
-· loadDay：加载指定单元的题目。
-· loadManualTask：加载手动答题任务，初始化计时器。
+· loadDay：加载指定单元的题目（带 session 校验）。
+· loadManualTask：加载手动答题任务，初始化计时器（带 session 校验）。
 · renderCatalogChips：渲染目录选择器。
 · renderManual：渲染题目卡片（音频、选项、原文、解析等），绑定选项点击等事件。
 · buildOptionHTML：生成选项 HTML。
 · buildDetailAllText / buildDetailCorrectText：生成详情弹窗的纯文本内容。
-· doSubmitManual：提交手动作答结果，包括错题和同步。
+· doSubmitManual：提交手动作答结果，包括错题和同步（带 session 校验）。
 
 8. history.js —— 历史记录模块
 
-· loadHistory：请求并渲染历史作业列表。
+· loadHistory：请求并渲染历史作业列表（带 session 校验，失效时提示）。
 · renderHistory：将历史数据渲染为卡片，显示任务名、正确率、时间，并提供“重做”按钮。
 · 重做时切换到手动答题 tab 并加载对应任务。
 
 9. king.js —— 万词王、账号信息、听力抓取
 
 · 万词王：
-  · runKingUpload：上传完成数到竞技场。
-  · showKingRank / loadKingRank：查看不同范围（全国/省/市/学校/班级）的排名。
+  · runKingUpload：上传完成数到竞技场（带 session 校验）。
+  · showKingRank / loadKingRank：查看不同范围（全国/省/市/学校/班级）的排名（showKingRank 带 session 校验）。
 · 账号信息：
-  · loadAccountInfo：获取并展示学习力、坚持天数、已掌握词、等级等信息。
-  · runSaveNumber：修改学习力/已掌握词/坚持天数并保存。
+  · loadAccountInfo：获取并展示学习力、坚持天数、已掌握词、等级等信息（带 session 校验）。
+  · runSaveNumber：修改学习力/已掌握词/坚持天数并保存（带 session 校验）。
 · 听力抓取：
-  · fetchHearing：按 day_id 范围抓取听力，展示列表。
+  · fetchHearing：按 day_id 范围抓取听力，展示列表（带 session 校验）。
   · renderHearingList：渲染听力结果卡片。
   · copyHearingAll / copyHearingAnswers：复制听力原文或答案。
-  · fetchTodayDayIds：获取今日 day_id 列表。
+  · fetchTodayDayIds：获取今日 day_id 列表（带 session 校验）。
 · 辅助函数：levelInfo（计算等级和进度）、accRow（生成账号信息行）、isTodayTs（判断今日时间戳）。
 
 10. app.js —— 入口与事件绑定
 
 · 初始化：调用 initState() 恢复状态。
 · 定义全局函数：fillTaskSelect（填充手动任务下拉框）、goTab（切换底部导航 tab）。
-· 登录相关：密码登录、短信登录（图形验证码、倒计时）、退出登录。
+· 动态添加 Session 登录 UI（分段项和输入区）。
+· 登录相关：
+  · 密码登录
+  · 短信登录（图形验证码、倒计时）
+  · Session 登录（输入手机号和 session，先调用 checkSessionValid 校验有效性）
+  · 退出登录
+· 顶部栏增加“复制Session”按钮，绑定复制事件。
+· 自动答题卡片上方添加项目 GitHub 链接和问题反馈邮箱。
 · 为各个按钮绑定事件：
   · 自动答题：启动、加载任务、打开排名、复制/清空日志。
   · 手动答题：加载任务、翻页、显示答案、复制答案、提交。
   · 历史：刷新历史。
   · 万词王及其他：上传、查看排名、获取账号信息、保存账号数据、计时器控制、抓取听力等。
 · 启动时检查会话有效性，决定进入应用或登录页。
+· 提供 checkSessionValid 函数挂载到 window，供其他模块或调试使用。
 
 11. index.html —— 页面结构
 
 · 包含登录页、主应用界面（四个 tab：自动答题、手动答题、历史、其他功能）。
+· 登录页包含三种登录方式：密码登录、短信验证码、Session 登录。
+· 主界面顶部栏增加“复制Session”按钮。
+· 自动答题页顶部增加项目信息（GitHub 链接和反馈邮箱）。
 · 集成弹窗：排名、提交确认、详情、计时器编辑。
 · 引入外部 CryptoJS 库。
 · 内联脚本实现时长选择器。
@@ -142,6 +158,7 @@
 · 定义 Material Design 风格的颜色变量、圆角、阴影。
 · 布局：顶部栏、底部导航、卡片、按钮、输入框、弹窗、日志区等。
 · 响应式适配移动端。
+· 样式未做功能性修改，保持原有风格。
 
 ---
 
@@ -160,12 +177,13 @@
 
 1. 运行方式：必须通过本地 HTTP 服务器访问（如 python -m http.server），避免 ES 模块的 CORS 限制。
 2. 跨域问题：API 服务器若未配置 CORS，需使用浏览器插件或本地代理解决。
-3. 登录：支持密码登录和短信验证码登录，登录后自动加载班级、任务等信息。
+3. 登录：
+   · 支持密码登录、短信验证码登录、Session 登录。
+   · 登录后自动加载班级、任务等信息。
 4. 自动答题：填写任务ID、班课ID（可自动），设置错题数量和时长，点击开始运行。
 5. 手动答题：选择任务，加载题目，可播放音频、选择答案、查看原文、复制答案、提交。
 6. 历史：查看历史作业并重做。
 7. 其他功能：上传万词王进度、查看排名、获取账号信息、修改账号数据、抓取听力内容等。
+8. Session 管理：顶部栏可复制当前 Session，便于在其他设备或工具中使用。
 
 ---
-
-以上即为各模块的功能介绍，结构清晰，便于后续维护和扩展。
